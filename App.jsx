@@ -1638,6 +1638,7 @@ export default function App() {
       <div style={SHELL}>
         <NavBar
           title={`Quiz ${currentQ + 1}/${questions.length}`}
+          onBack={() => { setScreen("home"); setReviewMode(false); }}
           right={CATEGORIES[q.category]}
         />
         {/* Progress bar under nav */}
