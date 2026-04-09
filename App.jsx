@@ -990,8 +990,159 @@ function updateStreak(streak) {
 // ============================================================================
 // MAIN APP COMPONENT
 // ============================================================================
+// ============================================================================
+// SHARED STYLES
+// ============================================================================
+const SHELL = {
+  minHeight: "100vh",
+  background: "var(--color-background-primary, #fafaf8)",
+  color: "var(--color-text-primary, #1a1a2e)",
+  fontFamily: "system-ui, -apple-system, sans-serif",
+  boxSizing: "border-box",
+  display: "flex",
+  flexDirection: "column",
+};
+
+const CONTAINER = {
+  width: "100%",
+  maxWidth: "500px",
+  margin: "0 auto",
+  padding: "0 1rem",
+  boxSizing: "border-box",
+};
+
+const BTN_BASE = {
+  padding: "0.875rem 1rem",
+  fontSize: "1rem",
+  fontWeight: 600,
+  border: "none",
+  borderRadius: "12px",
+  cursor: "pointer",
+  userSelect: "none",
+  WebkitTapHighlightColor: "transparent",
+  minHeight: "48px",
+  boxSizing: "border-box",
+};
+
+const BTN_PRIMARY = { ...BTN_BASE, background: "#1a1a2e", color: "#fff" };
+const BTN_OUTLINE = { ...BTN_BASE, background: "transparent", color: "#1a1a2e", border: "2px solid #ddd" };
+
+// ============================================================================
+// NAV BAR COMPONENT
+// ============================================================================
+function NavBar({ title, onBack, right }) {
+  return (
+    <div style={{
+      position: "sticky",
+      top: 0,
+      zIndex: 10,
+      background: "var(--color-background-primary, #fafaf8)",
+      borderBottom: "1px solid rgba(0,0,0,0.06)",
+      padding: "0 1rem",
+      height: "52px",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      userSelect: "none",
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", minWidth: 0 }}>
+        {onBack && (
+          <button
+            onClick={onBack}
+            style={{
+              background: "none", border: "none", cursor: "pointer", fontSize: "1.25rem",
+              padding: "4px 8px", borderRadius: "8px", lineHeight: 1,
+              color: "var(--color-text-primary, #1a1a2e)", WebkitTapHighlightColor: "transparent",
+            }}
+            aria-label="Wróć"
+          >
+            ←
+          </button>
+        )}
+        <span style={{ fontWeight: 700, fontSize: "1rem", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          {title}
+        </span>
+      </div>
+      {right && <div style={{ fontSize: "0.85rem", opacity: 0.5, flexShrink: 0 }}>{right}</div>}
+    </div>
+  );
+}
+
+// ============================================================================
+// BOTTOM TAB BAR COMPONENT
+// ============================================================================
+function TabBar({ active, onNavigate }) {
+  const tabs = [
+    { id: "home", label: "Quiz", icon: "▶" },
+    { id: "progress", label: "Postępy", icon: "◉" },
+    { id: "settings", label: "Ustawienia", icon: "⚙" },
+  ];
+  return (
+    <div style={{
+      position: "fixed",
+      bottom: 0,
+      left: 0,
+      right: 0,
+      zIndex: 10,
+      background: "var(--color-background-primary, #fafaf8)",
+      borderTop: "1px solid rgba(0,0,0,0.08)",
+      display: "flex",
+      justifyContent: "space-around",
+      paddingBottom: "env(safe-area-inset-bottom, 0px)",
+      userSelect: "none",
+    }}>
+      {tabs.map((t) => (
+        <button
+          key={t.id}
+          onClick={() => onNavigate(t.id)}
+          style={{
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: "2px",
+            padding: "10px 0 8px",
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            color: active === t.id ? "#1a1a2e" : "rgba(26,26,46,0.4)",
+            fontWeight: active === t.id ? 700 : 500,
+            fontSize: "0.7rem",
+            minHeight: "48px",
+            WebkitTapHighlightColor: "transparent",
+            transition: "color 0.15s",
+          }}
+        >
+          <span style={{ fontSize: "1.2rem", lineHeight: 1 }}>{t.icon}</span>
+          {t.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ============================================================================
+// SCREEN FADE WRAPPER
+// ============================================================================
+function ScreenFade({ children, screenKey }) {
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    setVisible(false);
+    const t = requestAnimationFrame(() => setVisible(true));
+    return () => cancelAnimationFrame(t);
+  }, [screenKey]);
+  return (
+    <div style={{ opacity: visible ? 1 : 0, transition: "opacity 0.15s ease" }}>
+      {children}
+    </div>
+  );
+}
+
+// ============================================================================
+// MAIN APP COMPONENT
+// ============================================================================
 export default function App() {
-  const [screen, setScreen] = useState("home"); // home, settings, quiz, summary
+  const [screen, setScreen] = useState("home"); // home, settings, quiz, summary, progress
   const [progress, setProgress] = useState(defaultProgress());
   const [loaded, setLoaded] = useState(false);
 
@@ -1043,6 +1194,33 @@ export default function App() {
     });
   }, [progress]);
 
+  // Category stats for progress screen
+  const categoryStats = useMemo(() => {
+    return Object.entries(CATEGORIES).map(([key, label]) => {
+      const catWords = CATEGORIZED_VOCAB.filter((w) => w.category === key);
+      const seen = catWords.filter((w) => progress.words[w.expression]).length;
+      const answered = catWords.reduce((s, w) => s + (progress.words[w.expression]?.total || 0), 0);
+      const correct = catWords.reduce((s, w) => s + (progress.words[w.expression]?.correct || 0), 0);
+      const pct = answered > 0 ? Math.round((correct / answered) * 100) : 0;
+      return { key, label, total: catWords.length, seen, pct };
+    });
+  }, [progress]);
+
+  // Top weak words for progress screen
+  const topWeakWords = useMemo(() => {
+    return CATEGORIZED_VOCAB
+      .filter((w) => {
+        const p = progress.words[w.expression];
+        return p && p.total >= 1;
+      })
+      .map((w) => {
+        const p = progress.words[w.expression];
+        return { ...w, pct: Math.round((p.correct / p.total) * 100), total: p.total };
+      })
+      .sort((a, b) => a.pct - b.pct)
+      .slice(0, 15);
+  }, [progress]);
+
   // Start quiz
   const startQuiz = useCallback(
     (review = false) => {
@@ -1058,7 +1236,6 @@ export default function App() {
       setResults([]);
       setFadeIn(true);
 
-      // Generate options for first question
       const catWords = CATEGORIZED_VOCAB.filter((w) => w.category === qs[0].category);
       setOptions(generateOptions(qs[0], catWords, mode));
 
@@ -1078,7 +1255,6 @@ export default function App() {
         { word: questions[currentQ], correct, chosen: optionWord },
       ]);
 
-      // Update progress
       setProgress((prev) => {
         const expr = questions[currentQ].expression;
         const existing = prev.words[expr] || { correct: 0, total: 0, lastSeen: 0 };
@@ -1095,7 +1271,6 @@ export default function App() {
         };
       });
 
-      // Auto advance
       const delay = correct ? 1500 : 3000;
       setTimeout(() => {
         if (currentQ + 1 < questions.length) {
@@ -1111,7 +1286,6 @@ export default function App() {
             setFadeIn(true);
           }, 200);
         } else {
-          // Quiz finished
           setProgress((prev) => ({
             ...prev,
             streak: updateStreak(prev.streak),
@@ -1124,17 +1298,18 @@ export default function App() {
     [selected, questions, currentQ, mode]
   );
 
-  // Category toggle
   const toggleCategory = (cat) => {
     setSelectedCategories((prev) =>
       prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat]
     );
   };
 
+  const showTabs = ["home", "progress", "settings"].includes(screen);
+
   if (!loaded) {
     return (
-      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh", fontFamily: "system-ui, sans-serif" }}>
-        <p style={{ fontSize: "1.25rem", color: "#666" }}>Ładowanie...</p>
+      <div style={{ ...SHELL, justifyContent: "center", alignItems: "center" }}>
+        <p style={{ fontSize: "1.25rem", opacity: 0.5 }}>Ładowanie...</p>
       </div>
     );
   }
@@ -1142,95 +1317,181 @@ export default function App() {
   // =========== HOME SCREEN ===========
   if (screen === "home") {
     return (
-      <div style={{
-        minHeight: "100vh",
-        background: "var(--color-background-primary, #fafaf8)",
-        color: "var(--color-text-primary, #1a1a2e)",
-        fontFamily: "system-ui, -apple-system, sans-serif",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        padding: "2rem 1rem",
-      }}>
-        <div style={{ textAlign: "center", marginBottom: "2rem" }}>
-          <h1 style={{ fontSize: "2.5rem", fontWeight: 800, marginBottom: "0.25rem", letterSpacing: "-0.02em" }}>
-            日本語クイズ
-          </h1>
-          <p style={{ fontSize: "1.1rem", opacity: 0.6, marginTop: 0 }}>JLPT N5 Quiz</p>
-        </div>
-
-        <div style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(3, 1fr)",
-          gap: "1rem",
-          marginBottom: "2rem",
-          width: "100%",
-          maxWidth: "400px",
-        }}>
-          {[
-            { label: "Przerobione", value: stats.seen, sub: `/ ${VOCAB_DATA.length}` },
-            { label: "Poprawność", value: `${stats.pct}%`, sub: "" },
-            { label: "Seria", value: stats.streak, sub: "dni" },
-          ].map((s) => (
-            <div key={s.label} style={{
-              background: "var(--color-background-secondary, #fff)",
-              borderRadius: "12px",
-              padding: "1rem",
-              textAlign: "center",
-              boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+      <div style={SHELL}>
+        <NavBar title="日本語クイズ" right="JLPT N5" />
+        <ScreenFade screenKey="home">
+          <div style={{ ...CONTAINER, paddingTop: "1.5rem", paddingBottom: "6rem" }}>
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(3, 1fr)",
+              gap: "0.75rem",
+              marginBottom: "1.5rem",
             }}>
-              <div style={{ fontSize: "1.5rem", fontWeight: 700 }}>{s.value}</div>
-              <div style={{ fontSize: "0.7rem", opacity: 0.5 }}>{s.sub}</div>
-              <div style={{ fontSize: "0.75rem", opacity: 0.6, marginTop: "0.25rem" }}>{s.label}</div>
+              {[
+                { label: "Przerobione", value: stats.seen, sub: `/ ${VOCAB_DATA.length}` },
+                { label: "Poprawność", value: `${stats.pct}%`, sub: "" },
+                { label: "Seria", value: stats.streak, sub: "dni" },
+              ].map((s) => (
+                <div key={s.label} style={{
+                  background: "var(--color-background-secondary, #fff)",
+                  borderRadius: "12px",
+                  padding: "0.875rem 0.5rem",
+                  textAlign: "center",
+                  boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+                }}>
+                  <div style={{ fontSize: "1.4rem", fontWeight: 700 }}>{s.value}</div>
+                  <div style={{ fontSize: "0.65rem", opacity: 0.5 }}>{s.sub}</div>
+                  <div style={{ fontSize: "0.7rem", opacity: 0.6, marginTop: "0.2rem" }}>{s.label}</div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", width: "100%", maxWidth: "400px" }}>
-          <button
-            onClick={() => setScreen("settings")}
-            style={{
-              padding: "1rem",
-              fontSize: "1.1rem",
-              fontWeight: 600,
-              background: "#1a1a2e",
-              color: "#fff",
-              border: "none",
-              borderRadius: "12px",
-              cursor: "pointer",
-              transition: "transform 0.1s",
-            }}
-            onMouseDown={(e) => (e.target.style.transform = "scale(0.98)")}
-            onMouseUp={(e) => (e.target.style.transform = "scale(1)")}
-          >
-            Rozpocznij quiz
-          </button>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+              <button
+                onClick={() => setScreen("settings")}
+                style={BTN_PRIMARY}
+              >
+                Rozpocznij quiz
+              </button>
 
-          {weakWords.length > 0 && (
-            <button
-              onClick={() => {
-                setScreen("settings");
-                setReviewMode(true);
-              }}
-              style={{
-                padding: "1rem",
-                fontSize: "1rem",
-                fontWeight: 600,
-                background: "transparent",
-                color: "#c0392b",
-                border: "2px solid #c0392b",
-                borderRadius: "12px",
-                cursor: "pointer",
-              }}
-            >
-              Powtórka błędów ({weakWords.length} słów)
-            </button>
-          )}
-        </div>
+              {weakWords.length > 0 && (
+                <button
+                  onClick={() => {
+                    setReviewMode(true);
+                    setScreen("settings");
+                  }}
+                  style={{ ...BTN_OUTLINE, color: "#c0392b", borderColor: "#c0392b" }}
+                >
+                  Powtórka błędów ({weakWords.length} słów)
+                </button>
+              )}
+            </div>
 
-        <p style={{ marginTop: "2rem", fontSize: "0.8rem", opacity: 0.4 }}>
-          {VOCAB_DATA.length} słów JLPT N5
-        </p>
+            <p style={{ textAlign: "center", marginTop: "1.5rem", fontSize: "0.75rem", opacity: 0.35 }}>
+              {VOCAB_DATA.length} słów JLPT N5
+            </p>
+          </div>
+        </ScreenFade>
+        <TabBar active="home" onNavigate={setScreen} />
+      </div>
+    );
+  }
+
+  // =========== PROGRESS SCREEN ===========
+  if (screen === "progress") {
+    return (
+      <div style={SHELL}>
+        <NavBar title="Postępy" />
+        <ScreenFade screenKey="progress">
+          <div style={{ ...CONTAINER, paddingTop: "1.5rem", paddingBottom: "6rem" }}>
+            {/* Overview stats */}
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(2, 1fr)",
+              gap: "0.75rem",
+              marginBottom: "1.5rem",
+            }}>
+              {[
+                { label: "Słowa poznane", value: `${stats.seen} / ${VOCAB_DATA.length}` },
+                { label: "Poprawność", value: `${stats.pct}%` },
+                { label: "Quizy ukończone", value: progress.totalQuizzes },
+                { label: "Seria dni", value: `${stats.streak} dni` },
+              ].map((s) => (
+                <div key={s.label} style={{
+                  background: "var(--color-background-secondary, #fff)",
+                  borderRadius: "12px",
+                  padding: "0.875rem",
+                  boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+                }}>
+                  <div style={{ fontSize: "1.25rem", fontWeight: 700 }}>{s.value}</div>
+                  <div style={{ fontSize: "0.75rem", opacity: 0.5, marginTop: "0.15rem" }}>{s.label}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Category breakdown */}
+            <h3 style={{ fontSize: "0.9rem", fontWeight: 700, marginBottom: "0.75rem", opacity: 0.7 }}>
+              Kategorie
+            </h3>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", marginBottom: "1.5rem" }}>
+              {categoryStats.map((c) => (
+                <div key={c.key} style={{
+                  background: "var(--color-background-secondary, #fff)",
+                  borderRadius: "10px",
+                  padding: "0.75rem",
+                  boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+                }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.35rem" }}>
+                    <span style={{ fontWeight: 600, fontSize: "0.85rem" }}>{c.label}</span>
+                    <span style={{ fontSize: "0.75rem", opacity: 0.5 }}>
+                      {c.seen}/{c.total} {c.pct > 0 ? `· ${c.pct}%` : ""}
+                    </span>
+                  </div>
+                  <div style={{
+                    width: "100%",
+                    height: "4px",
+                    background: "#e8e8e8",
+                    borderRadius: "2px",
+                    overflow: "hidden",
+                  }}>
+                    <div style={{
+                      height: "100%",
+                      width: `${(c.seen / c.total) * 100}%`,
+                      background: c.pct >= 80 ? "#27ae60" : c.pct >= 50 ? "#f39c12" : "#1a1a2e",
+                      borderRadius: "2px",
+                      transition: "width 0.3s",
+                    }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Weakest words */}
+            {topWeakWords.length > 0 && (
+              <>
+                <h3 style={{ fontSize: "0.9rem", fontWeight: 700, marginBottom: "0.75rem", opacity: 0.7 }}>
+                  Najtrudniejsze słowa
+                </h3>
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+                  {topWeakWords.map((w, i) => (
+                    <div key={i} style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "0.6rem 0.75rem",
+                      background: "var(--color-background-secondary, #fff)",
+                      borderRadius: "8px",
+                      borderLeft: `3px solid ${w.pct >= 60 ? "#f39c12" : "#c0392b"}`,
+                    }}>
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <span style={{ fontWeight: 700, fontSize: "1.1rem" }}>{w.expression}</span>
+                        <span style={{ opacity: 0.4, fontSize: "0.8rem", marginLeft: "0.5rem" }}>{w.reading}</span>
+                        <div style={{ fontSize: "0.8rem", opacity: 0.6, marginTop: "0.1rem" }}>{w.pl}</div>
+                      </div>
+                      <span style={{
+                        fontSize: "0.8rem",
+                        fontWeight: 700,
+                        color: w.pct >= 60 ? "#f39c12" : "#c0392b",
+                        flexShrink: 0,
+                        marginLeft: "0.5rem",
+                      }}>
+                        {w.pct}%
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {stats.seen === 0 && (
+              <div style={{ textAlign: "center", padding: "2rem 0", opacity: 0.4 }}>
+                <p style={{ fontSize: "1.5rem", marginBottom: "0.5rem" }}>まだ</p>
+                <p style={{ fontSize: "0.9rem" }}>Brak danych. Rozpocznij quiz!</p>
+              </div>
+            )}
+          </div>
+        </ScreenFade>
+        <TabBar active="progress" onNavigate={setScreen} />
       </div>
     );
   }
@@ -1243,131 +1504,125 @@ export default function App() {
     }
 
     return (
-      <div style={{
-        minHeight: "100vh",
-        background: "var(--color-background-primary, #fafaf8)",
-        color: "var(--color-text-primary, #1a1a2e)",
-        fontFamily: "system-ui, -apple-system, sans-serif",
-        padding: "2rem 1rem",
-        maxWidth: "500px",
-        margin: "0 auto",
-      }}>
-        <button
-          onClick={() => { setScreen("home"); setReviewMode(false); }}
-          style={{ background: "none", border: "none", cursor: "pointer", fontSize: "1rem", opacity: 0.6, marginBottom: "1rem", padding: 0 }}
-        >
-          ← Wróć
-        </button>
-
-        <h2 style={{ fontSize: "1.5rem", fontWeight: 700, marginBottom: "1.5rem" }}>
-          {reviewMode ? "Powtórka błędów" : "Ustawienia quizu"}
-        </h2>
-
-        {/* Mode selection */}
-        <div style={{ marginBottom: "1.5rem" }}>
-          <label style={{ fontWeight: 600, fontSize: "0.9rem", display: "block", marginBottom: "0.5rem" }}>
-            Tryb
-          </label>
-          <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-            {[
-              { value: "jp-pl", label: "JP → PL" },
-              { value: "pl-jp", label: "PL → JP" },
-              { value: "reading", label: "Czytanie → Znaczenie" },
-            ].map((m) => (
-              <button
-                key={m.value}
-                onClick={() => setMode(m.value)}
-                style={{
-                  padding: "0.5rem 1rem",
-                  borderRadius: "8px",
-                  border: mode === m.value ? "2px solid #1a1a2e" : "2px solid #ddd",
-                  background: mode === m.value ? "#1a1a2e" : "transparent",
-                  color: mode === m.value ? "#fff" : "inherit",
-                  cursor: "pointer",
-                  fontWeight: 500,
-                  fontSize: "0.85rem",
-                }}
-              >
-                {m.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Categories */}
-        {!reviewMode && (
-          <div style={{ marginBottom: "1.5rem" }}>
-            <label style={{ fontWeight: 600, fontSize: "0.9rem", display: "block", marginBottom: "0.5rem" }}>
-              Kategorie
-            </label>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem" }}>
-              {Object.entries(CATEGORIES).map(([key, label]) => (
-                <button
-                  key={key}
-                  onClick={() => toggleCategory(key)}
-                  style={{
-                    padding: "0.4rem 0.75rem",
-                    borderRadius: "20px",
-                    border: selectedCategories.includes(key) ? "2px solid #1a1a2e" : "2px solid #ddd",
-                    background: selectedCategories.includes(key) ? "#1a1a2e" : "transparent",
-                    color: selectedCategories.includes(key) ? "#fff" : "inherit",
-                    cursor: "pointer",
-                    fontSize: "0.8rem",
-                    fontWeight: 500,
-                  }}
-                >
-                  {label} ({catCounts[key]})
-                </button>
-              ))}
+      <div style={SHELL}>
+        <NavBar
+          title={reviewMode ? "Powtórka błędów" : "Ustawienia quizu"}
+          onBack={() => { setScreen("home"); setReviewMode(false); }}
+        />
+        <ScreenFade screenKey="settings">
+          <div style={{ ...CONTAINER, paddingTop: "1.25rem", paddingBottom: showTabs ? "6rem" : "2rem" }}>
+            {/* Mode selection */}
+            <div style={{ marginBottom: "1.5rem" }}>
+              <label style={{ fontWeight: 600, fontSize: "0.85rem", display: "block", marginBottom: "0.5rem" }}>
+                Tryb
+              </label>
+              <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                {[
+                  { value: "jp-pl", label: "JP → PL" },
+                  { value: "pl-jp", label: "PL → JP" },
+                  { value: "reading", label: "Czytanie" },
+                ].map((m) => (
+                  <button
+                    key={m.value}
+                    onClick={() => setMode(m.value)}
+                    style={{
+                      padding: "0.6rem 1rem",
+                      borderRadius: "8px",
+                      border: mode === m.value ? "2px solid #1a1a2e" : "2px solid #ddd",
+                      background: mode === m.value ? "#1a1a2e" : "transparent",
+                      color: mode === m.value ? "#fff" : "inherit",
+                      cursor: "pointer",
+                      fontWeight: 500,
+                      fontSize: "0.85rem",
+                      minHeight: "44px",
+                      userSelect: "none",
+                      WebkitTapHighlightColor: "transparent",
+                    }}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
-        )}
 
-        {/* Question count */}
-        {!reviewMode && (
-          <div style={{ marginBottom: "2rem" }}>
-            <label style={{ fontWeight: 600, fontSize: "0.9rem", display: "block", marginBottom: "0.5rem" }}>
-              Liczba pytań
-            </label>
-            <div style={{ display: "flex", gap: "0.5rem" }}>
-              {[10, 20, 50].map((n) => (
-                <button
-                  key={n}
-                  onClick={() => setQuestionCount(n)}
-                  style={{
-                    padding: "0.5rem 1.25rem",
-                    borderRadius: "8px",
-                    border: questionCount === n ? "2px solid #1a1a2e" : "2px solid #ddd",
-                    background: questionCount === n ? "#1a1a2e" : "transparent",
-                    color: questionCount === n ? "#fff" : "inherit",
-                    cursor: "pointer",
-                    fontWeight: 600,
-                  }}
-                >
-                  {n}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+            {/* Categories */}
+            {!reviewMode && (
+              <div style={{ marginBottom: "1.5rem" }}>
+                <label style={{ fontWeight: 600, fontSize: "0.85rem", display: "block", marginBottom: "0.5rem" }}>
+                  Kategorie
+                </label>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem" }}>
+                  {Object.entries(CATEGORIES).map(([key, label]) => (
+                    <button
+                      key={key}
+                      onClick={() => toggleCategory(key)}
+                      style={{
+                        padding: "0.5rem 0.75rem",
+                        borderRadius: "20px",
+                        border: selectedCategories.includes(key) ? "2px solid #1a1a2e" : "2px solid #ddd",
+                        background: selectedCategories.includes(key) ? "#1a1a2e" : "transparent",
+                        color: selectedCategories.includes(key) ? "#fff" : "inherit",
+                        cursor: "pointer",
+                        fontSize: "0.8rem",
+                        fontWeight: 500,
+                        minHeight: "36px",
+                        userSelect: "none",
+                        WebkitTapHighlightColor: "transparent",
+                      }}
+                    >
+                      {label} ({catCounts[key]})
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
-        <button
-          onClick={() => startQuiz(reviewMode)}
-          disabled={!reviewMode && selectedCategories.length === 0}
-          style={{
-            width: "100%",
-            padding: "1rem",
-            fontSize: "1.1rem",
-            fontWeight: 600,
-            background: (!reviewMode && selectedCategories.length === 0) ? "#ccc" : "#1a1a2e",
-            color: "#fff",
-            border: "none",
-            borderRadius: "12px",
-            cursor: (!reviewMode && selectedCategories.length === 0) ? "default" : "pointer",
-          }}
-        >
-          Start
-        </button>
+            {/* Question count */}
+            {!reviewMode && (
+              <div style={{ marginBottom: "1.75rem" }}>
+                <label style={{ fontWeight: 600, fontSize: "0.85rem", display: "block", marginBottom: "0.5rem" }}>
+                  Liczba pytań
+                </label>
+                <div style={{ display: "flex", gap: "0.5rem" }}>
+                  {[10, 20, 50].map((n) => (
+                    <button
+                      key={n}
+                      onClick={() => setQuestionCount(n)}
+                      style={{
+                        padding: "0.6rem 1.25rem",
+                        borderRadius: "8px",
+                        border: questionCount === n ? "2px solid #1a1a2e" : "2px solid #ddd",
+                        background: questionCount === n ? "#1a1a2e" : "transparent",
+                        color: questionCount === n ? "#fff" : "inherit",
+                        cursor: "pointer",
+                        fontWeight: 600,
+                        minHeight: "44px",
+                        userSelect: "none",
+                        WebkitTapHighlightColor: "transparent",
+                      }}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <button
+              onClick={() => startQuiz(reviewMode)}
+              disabled={!reviewMode && selectedCategories.length === 0}
+              style={{
+                ...BTN_PRIMARY,
+                width: "100%",
+                opacity: (!reviewMode && selectedCategories.length === 0) ? 0.4 : 1,
+                cursor: (!reviewMode && selectedCategories.length === 0) ? "default" : "pointer",
+              }}
+            >
+              Start
+            </button>
+          </div>
+        </ScreenFade>
+        <TabBar active="settings" onNavigate={(s) => { setReviewMode(false); setScreen(s); }} />
       </div>
     );
   }
@@ -1380,139 +1635,124 @@ export default function App() {
     const showCard = selected && !isCorrect;
 
     return (
-      <div style={{
-        minHeight: "100vh",
-        background: "var(--color-background-primary, #fafaf8)",
-        color: "var(--color-text-primary, #1a1a2e)",
-        fontFamily: "system-ui, -apple-system, sans-serif",
-        padding: "1.5rem 1rem",
-        maxWidth: "500px",
-        margin: "0 auto",
-      }}>
-        {/* Progress */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
-          <span style={{ fontSize: "0.9rem", fontWeight: 600, opacity: 0.6 }}>
-            {currentQ + 1} / {questions.length}
-          </span>
-          <span style={{ fontSize: "0.75rem", opacity: 0.4 }}>
-            {CATEGORIES[q.category]}
-          </span>
-        </div>
-        <div style={{
-          width: "100%",
-          height: "4px",
-          background: "#e0e0e0",
-          borderRadius: "2px",
-          marginBottom: "2rem",
-          overflow: "hidden",
-        }}>
+      <div style={SHELL}>
+        <NavBar
+          title={`Quiz ${currentQ + 1}/${questions.length}`}
+          right={CATEGORIES[q.category]}
+        />
+        {/* Progress bar under nav */}
+        <div style={{ width: "100%", height: "3px", background: "#e0e0e0" }}>
           <div style={{
             height: "100%",
             width: `${progressPct}%`,
             background: "#1a1a2e",
-            borderRadius: "2px",
             transition: "width 0.3s ease",
           }} />
         </div>
 
-        {/* Question */}
-        <div style={{
-          textAlign: "center",
-          marginBottom: "2rem",
-          opacity: fadeIn ? 1 : 0,
-          transition: "opacity 0.2s ease",
-        }}>
-          {mode === "jp-pl" && (
-            <>
-              <div style={{ fontSize: "3rem", fontWeight: 700, lineHeight: 1.2 }}>
-                {q.expression}
+        <div style={{ ...CONTAINER, paddingTop: "1.5rem", paddingBottom: "2rem", flex: 1 }}>
+          {/* Question */}
+          <div style={{
+            textAlign: "center",
+            marginBottom: "2rem",
+            opacity: fadeIn ? 1 : 0,
+            transition: "opacity 0.2s ease",
+          }}>
+            {mode === "jp-pl" && (
+              <>
+                <div style={{ fontSize: "3rem", fontWeight: 700, lineHeight: 1.2 }}>
+                  {q.expression}
+                </div>
+                <div style={{ fontSize: "1.1rem", opacity: 0.5, marginTop: "0.5rem" }}>
+                  {q.reading}
+                </div>
+              </>
+            )}
+            {mode === "pl-jp" && (
+              <div style={{ fontSize: "1.75rem", fontWeight: 600, padding: "0.5rem 0" }}>
+                {q.pl}
               </div>
-              <div style={{ fontSize: "1.1rem", opacity: 0.5, marginTop: "0.5rem" }}>
+            )}
+            {mode === "reading" && (
+              <div style={{ fontSize: "3rem", fontWeight: 700 }}>
                 {q.reading}
               </div>
-            </>
-          )}
-          {mode === "pl-jp" && (
-            <div style={{ fontSize: "1.75rem", fontWeight: 600 }}>
-              {q.pl}
-            </div>
-          )}
-          {mode === "reading" && (
-            <div style={{ fontSize: "3rem", fontWeight: 700 }}>
-              {q.reading}
-            </div>
-          )}
-        </div>
-
-        {/* Options */}
-        <div style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: "0.75rem",
-          opacity: fadeIn ? 1 : 0,
-          transition: "opacity 0.2s ease",
-        }}>
-          {options.map((opt, i) => {
-            let bg = "var(--color-background-secondary, #fff)";
-            let border = "2px solid #e0e0e0";
-            let textColor = "inherit";
-
-            if (selected) {
-              if (opt.expression === q.expression) {
-                bg = "#27ae60";
-                border = "2px solid #27ae60";
-                textColor = "#fff";
-              } else if (opt.expression === selected) {
-                bg = "#c0392b";
-                border = "2px solid #c0392b";
-                textColor = "#fff";
-              }
-            }
-
-            const displayValue =
-              mode === "jp-pl" ? opt.pl :
-              mode === "pl-jp" ? opt.expression :
-              opt.pl;
-
-            return (
-              <button
-                key={`${opt.expression}-${i}`}
-                onClick={() => handleAnswer(opt)}
-                disabled={selected !== null}
-                style={{
-                  padding: "1rem",
-                  fontSize: mode === "pl-jp" ? "1.25rem" : "1rem",
-                  fontWeight: 500,
-                  background: bg,
-                  color: textColor,
-                  border,
-                  borderRadius: "12px",
-                  cursor: selected ? "default" : "pointer",
-                  textAlign: "left",
-                  transition: "background 0.2s, border 0.2s",
-                }}
-              >
-                {displayValue}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Wrong answer card */}
-        {showCard && (
-          <div style={{
-            marginTop: "1.5rem",
-            padding: "1rem",
-            background: "rgba(192,57,43,0.08)",
-            borderRadius: "12px",
-            textAlign: "center",
-            border: "1px solid rgba(192,57,43,0.2)",
-          }}>
-            <div style={{ fontSize: "1.5rem", fontWeight: 700 }}>{q.expression}</div>
-            <div style={{ fontSize: "0.95rem", opacity: 0.6 }}>{q.reading}</div>
-            <div style={{ fontSize: "1rem", fontWeight: 600, marginTop: "0.5rem" }}>{q.pl}</div>
+            )}
           </div>
-        )}
+
+          {/* Options */}
+          <div style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "0.75rem",
+            opacity: fadeIn ? 1 : 0,
+            transition: "opacity 0.2s ease",
+          }}>
+            {options.map((opt, i) => {
+              let bg = "var(--color-background-secondary, #fff)";
+              let border = "2px solid #e0e0e0";
+              let textColor = "inherit";
+
+              if (selected) {
+                if (opt.expression === q.expression) {
+                  bg = "#27ae60";
+                  border = "2px solid #27ae60";
+                  textColor = "#fff";
+                } else if (opt.expression === selected) {
+                  bg = "#c0392b";
+                  border = "2px solid #c0392b";
+                  textColor = "#fff";
+                }
+              }
+
+              const displayValue =
+                mode === "jp-pl" ? opt.pl :
+                mode === "pl-jp" ? opt.expression :
+                opt.pl;
+
+              return (
+                <button
+                  key={`${opt.expression}-${i}`}
+                  onClick={() => handleAnswer(opt)}
+                  disabled={selected !== null}
+                  style={{
+                    padding: "0.875rem 1rem",
+                    fontSize: mode === "pl-jp" ? "1.2rem" : "1rem",
+                    fontWeight: 500,
+                    background: bg,
+                    color: textColor,
+                    border,
+                    borderRadius: "12px",
+                    cursor: selected ? "default" : "pointer",
+                    textAlign: "left",
+                    transition: "background 0.2s, border 0.2s",
+                    minHeight: "48px",
+                    userSelect: "none",
+                    WebkitTapHighlightColor: "transparent",
+                  }}
+                >
+                  {displayValue}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Wrong answer card */}
+          {showCard && (
+            <div style={{
+              marginTop: "1.25rem",
+              padding: "1rem",
+              background: "rgba(192,57,43,0.08)",
+              borderRadius: "12px",
+              textAlign: "center",
+              border: "1px solid rgba(192,57,43,0.2)",
+            }}>
+              <div style={{ fontSize: "1.5rem", fontWeight: 700 }}>{q.expression}</div>
+              <div style={{ fontSize: "0.95rem", opacity: 0.6 }}>{q.reading}</div>
+              <div style={{ fontSize: "1rem", fontWeight: 600, marginTop: "0.5rem" }}>{q.pl}</div>
+            </div>
+          )}
+        </div>
       </div>
     );
   }
@@ -1525,97 +1765,67 @@ export default function App() {
     const errors = results.filter((r) => !r.correct);
 
     return (
-      <div style={{
-        minHeight: "100vh",
-        background: "var(--color-background-primary, #fafaf8)",
-        color: "var(--color-text-primary, #1a1a2e)",
-        fontFamily: "system-ui, -apple-system, sans-serif",
-        padding: "2rem 1rem",
-        maxWidth: "500px",
-        margin: "0 auto",
-      }}>
-        <div style={{ textAlign: "center", marginBottom: "2rem" }}>
-          <h2 style={{ fontSize: "1.5rem", fontWeight: 700, marginBottom: "0.5rem" }}>
-            Wynik
-          </h2>
-          <div style={{ fontSize: "3rem", fontWeight: 800 }}>
-            {correct} / {total}
-          </div>
-          <div style={{
-            fontSize: "1.25rem",
-            fontWeight: 600,
-            color: pct >= 80 ? "#27ae60" : pct >= 50 ? "#f39c12" : "#c0392b",
-          }}>
-            {pct}%
-          </div>
-          {pct === 100 && <div style={{ fontSize: "1.1rem", marginTop: "0.5rem" }}>Doskonale!</div>}
-        </div>
+      <div style={SHELL}>
+        <NavBar title="Wynik" onBack={() => { setScreen("home"); setReviewMode(false); }} />
+        <ScreenFade screenKey="summary">
+          <div style={{ ...CONTAINER, paddingTop: "1.5rem", paddingBottom: "2rem" }}>
+            <div style={{ textAlign: "center", marginBottom: "2rem" }}>
+              <div style={{ fontSize: "3rem", fontWeight: 800 }}>
+                {correct} / {total}
+              </div>
+              <div style={{
+                fontSize: "1.25rem",
+                fontWeight: 600,
+                color: pct >= 80 ? "#27ae60" : pct >= 50 ? "#f39c12" : "#c0392b",
+              }}>
+                {pct}%
+              </div>
+              {pct === 100 && <div style={{ fontSize: "1.1rem", marginTop: "0.5rem" }}>Doskonale!</div>}
+            </div>
 
-        {errors.length > 0 && (
-          <div style={{ marginBottom: "2rem" }}>
-            <h3 style={{ fontSize: "1rem", fontWeight: 600, marginBottom: "0.75rem", opacity: 0.7 }}>
-              Błędy ({errors.length})
-            </h3>
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-              {errors.map((err, i) => (
-                <div
-                  key={i}
-                  style={{
-                    padding: "0.75rem 1rem",
-                    background: "rgba(192,57,43,0.06)",
-                    borderRadius: "10px",
-                    borderLeft: "3px solid #c0392b",
-                  }}
-                >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span style={{ fontSize: "1.25rem", fontWeight: 700 }}>
-                      {err.word.expression}
-                    </span>
-                    <span style={{ fontSize: "0.85rem", opacity: 0.5 }}>
-                      {err.word.reading}
-                    </span>
-                  </div>
-                  <div style={{ fontSize: "0.9rem", fontWeight: 500, marginTop: "0.25rem" }}>
-                    {err.word.pl}
-                  </div>
+            {errors.length > 0 && (
+              <div style={{ marginBottom: "2rem" }}>
+                <h3 style={{ fontSize: "0.9rem", fontWeight: 600, marginBottom: "0.75rem", opacity: 0.7 }}>
+                  Błędy ({errors.length})
+                </h3>
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                  {errors.map((err, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        padding: "0.75rem 1rem",
+                        background: "rgba(192,57,43,0.06)",
+                        borderRadius: "10px",
+                        borderLeft: "3px solid #c0392b",
+                      }}
+                    >
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <span style={{ fontSize: "1.2rem", fontWeight: 700 }}>
+                          {err.word.expression}
+                        </span>
+                        <span style={{ fontSize: "0.8rem", opacity: 0.5 }}>
+                          {err.word.reading}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: "0.85rem", fontWeight: 500, marginTop: "0.2rem" }}>
+                        {err.word.pl}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              </div>
+            )}
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+              <button onClick={() => startQuiz(reviewMode)} style={BTN_PRIMARY}>
+                Jeszcze raz
+              </button>
+              <button onClick={() => { setScreen("home"); setReviewMode(false); }} style={BTN_OUTLINE}>
+                Menu główne
+              </button>
             </div>
           </div>
-        )}
-
-        <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-          <button
-            onClick={() => startQuiz(reviewMode)}
-            style={{
-              padding: "1rem",
-              fontSize: "1rem",
-              fontWeight: 600,
-              background: "#1a1a2e",
-              color: "#fff",
-              border: "none",
-              borderRadius: "12px",
-              cursor: "pointer",
-            }}
-          >
-            Jeszcze raz
-          </button>
-          <button
-            onClick={() => { setScreen("home"); setReviewMode(false); }}
-            style={{
-              padding: "1rem",
-              fontSize: "1rem",
-              fontWeight: 600,
-              background: "transparent",
-              color: "#1a1a2e",
-              border: "2px solid #ddd",
-              borderRadius: "12px",
-              cursor: "pointer",
-            }}
-          >
-            Menu główne
-          </button>
-        </div>
+        </ScreenFade>
       </div>
     );
   }
