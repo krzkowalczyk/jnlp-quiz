@@ -1708,7 +1708,7 @@ export default function App() {
 
               const displayValue =
                 mode === "jp-pl" ? opt.pl :
-                mode === "pl-jp" ? opt.expression :
+                mode === "pl-jp" ? null :
                 opt.pl;
 
               return (
@@ -1732,7 +1732,16 @@ export default function App() {
                     WebkitTapHighlightColor: "transparent",
                   }}
                 >
-                  {displayValue}
+                  {mode === "pl-jp" ? (
+                    <span style={{ display: "flex", alignItems: "baseline", gap: "0.5rem" }}>
+                      <span>{opt.expression}</span>
+                      {opt.expression !== opt.reading && (
+                        <span style={{ fontSize: "0.8rem", opacity: selected ? 0.7 : 0.45, fontWeight: 400 }}>
+                          {opt.reading}
+                        </span>
+                      )}
+                    </span>
+                  ) : displayValue}
                 </button>
               );
             })}
