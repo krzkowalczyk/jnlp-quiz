@@ -947,28 +947,7 @@ function generateOptions(correctWord, allInCategory, mode) {
       options.push(w);
     }
   }
-  // If not enough from same category, fill from all
-  if (options.length < 4) {
-    const allPool = shuffleArray(
-      CATEGORIZED_VOCAB.filter(
-        (w) =>
-          !options.some((o) => o.expression === w.expression) &&
-          w.expression !== correctWord.expression
-      )
-    );
-    for (const w of allPool) {
-      if (options.length >= 4) break;
-      const getVal = (word) => {
-        if (mode === "jp-pl") return word.pl;
-        if (mode === "pl-jp") return word.expression;
-        if (mode === "reading") return word.pl;
-        return word.pl;
-      };
-      if (!options.some((o) => getVal(o) === getVal(w))) {
-        options.push(w);
-      }
-    }
-  }
+  // Only use same-category words for distractors
   return shuffleArray(options);
 }
 
