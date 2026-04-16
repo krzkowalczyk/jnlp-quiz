@@ -1019,7 +1019,7 @@ function NavBar({ title, onBack, right }) {
       borderBottom: "1px solid rgba(0,0,0,0.06)",
       padding: "0 1rem",
       paddingTop: "env(safe-area-inset-top)",
-      height: "calc(52px + env(safe-area-inset-top))",
+      height: "calc(44px + env(safe-area-inset-top))",
       display: "flex",
       alignItems: "center",
       justifyContent: "space-between",
