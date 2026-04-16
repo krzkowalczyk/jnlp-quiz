@@ -1705,7 +1705,7 @@ export default function App() {
                     border,
                     borderRadius: "12px",
                     cursor: selected ? "default" : "pointer",
-                    textAlign: "left",
+                    textAlign: "center",
                     transition: "background 0.2s, border 0.2s",
                     minHeight: "48px",
                     userSelect: "none",
