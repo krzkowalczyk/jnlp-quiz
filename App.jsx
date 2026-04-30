@@ -1698,7 +1698,7 @@ export default function App() {
                   disabled={selected !== null}
                   style={{
                     padding: "0.875rem 1rem",
-                    fontSize: mode === "pl-jp" ? "1.2rem" : "1rem",
+                    fontSize: "1.4rem",
                     fontWeight: 500,
                     background: bg,
                     color: textColor,
@@ -1716,7 +1716,7 @@ export default function App() {
                     <span style={{ display: "flex", alignItems: "baseline", gap: "0.5rem" }}>
                       <span>{opt.expression}</span>
                       {opt.expression !== opt.reading && (
-                        <span style={{ fontSize: "0.8rem", opacity: selected ? 0.7 : 0.45, fontWeight: 400 }}>
+                        <span style={{ fontSize: "0.95rem", opacity: selected ? 0.7 : 0.5, fontWeight: 400 }}>
                           {opt.reading}
                         </span>
                       )}
