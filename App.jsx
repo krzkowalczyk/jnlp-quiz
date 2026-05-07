@@ -1,4 +1,7 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useContext } from "react";
+import { useRegisterSW } from "virtual:pwa-register/react";
+
+const BUILD_VERSION = typeof __BUILD_VERSION__ !== "undefined" ? __BUILD_VERSION__ : "dev";
 
 // ============================================================================
 // VOCAB DATA — 718 JLPT N5 words with Polish translations
@@ -1119,9 +1122,99 @@ function ScreenFade({ children, screenKey }) {
 }
 
 // ============================================================================
+// PWA UPDATE CONTEXT, BANNER & MANUAL CHECK BUTTON
+// ============================================================================
+const UpdateContext = React.createContext(null);
+
+function UpdateProvider({ children }) {
+  const update = useRegisterSW({
+    onRegisteredSW(_swUrl, registration) {
+      if (!registration) return;
+      const check = () => { registration.update().catch(() => {}); };
+      check();
+      setInterval(() => {
+        if (document.visibilityState === "visible") check();
+      }, 60_000);
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") check();
+      });
+    },
+  });
+  return <UpdateContext.Provider value={update}>{children}</UpdateContext.Provider>;
+}
+
+function UpdateBanner() {
+  const ctx = useContext(UpdateContext);
+  if (!ctx) return null;
+  const { needRefresh: [needRefresh], updateServiceWorker } = ctx;
+  if (!needRefresh) return null;
+  return (
+    <div style={{
+      position: "fixed", top: 0, left: 0, right: 0,
+      zIndex: 100,
+      background: "#1a1a2e", color: "#fff",
+      padding: "0.75rem 1rem",
+      paddingTop: "calc(0.75rem + env(safe-area-inset-top))",
+      display: "flex", alignItems: "center", justifyContent: "space-between", gap: "0.75rem",
+      boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+    }}>
+      <span style={{ fontSize: "0.95rem", fontWeight: 500 }}>Nowa wersja dostępna</span>
+      <button
+        onClick={() => updateServiceWorker(true)}
+        style={{
+          background: "#fff", color: "#1a1a2e", border: "none",
+          padding: "0.5rem 0.9rem", borderRadius: "8px",
+          fontWeight: 600, cursor: "pointer", fontSize: "0.9rem",
+          WebkitTapHighlightColor: "transparent",
+        }}
+      >
+        Aktualizuj
+      </button>
+    </div>
+  );
+}
+
+function UpdateCheckButton() {
+  const ctx = useContext(UpdateContext);
+  const [checking, setChecking] = useState(false);
+  const [toast, setToast] = useState(null);
+  if (!ctx) return null;
+  const onClick = async () => {
+    setChecking(true);
+    try {
+      const reg = await navigator.serviceWorker?.getRegistration();
+      if (reg) await reg.update();
+    } catch {}
+    await new Promise((r) => setTimeout(r, 800));
+    setChecking(false);
+    setToast("Sprawdzono aktualizacje");
+    setTimeout(() => setToast(null), 2000);
+  };
+  return (
+    <div style={{ marginTop: "1.5rem" }}>
+      <button
+        onClick={onClick}
+        disabled={checking}
+        style={{ ...BTN_OUTLINE, width: "100%", opacity: checking ? 0.6 : 1 }}
+      >
+        {checking ? "Sprawdzanie…" : "Sprawdź aktualizacje"}
+      </button>
+      {toast && (
+        <div style={{ marginTop: "0.5rem", textAlign: "center", fontSize: "0.85rem", opacity: 0.6 }}>
+          {toast}
+        </div>
+      )}
+      <div style={{ marginTop: "0.75rem", textAlign: "center", fontSize: "0.75rem", opacity: 0.4 }}>
+        Wersja {BUILD_VERSION}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
 // MAIN APP COMPONENT
 // ============================================================================
-export default function App() {
+function AppContent() {
   const [screen, setScreen] = useState("home"); // home, settings, quiz, summary, progress
   const [progress, setProgress] = useState(defaultProgress());
   const [loaded, setLoaded] = useState(false);
@@ -1600,6 +1693,8 @@ export default function App() {
             >
               Start
             </button>
+
+            <UpdateCheckButton />
           </div>
         </ScreenFade>
         <TabBar active="settings" onNavigate={(s) => { setReviewMode(false); setScreen(s); }} />
@@ -1821,4 +1916,13 @@ export default function App() {
   }
 
   return null;
+}
+
+export default function App() {
+  return (
+    <UpdateProvider>
+      <UpdateBanner />
+      <AppContent />
+    </UpdateProvider>
+  );
 }
