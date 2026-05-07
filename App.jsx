@@ -1698,7 +1698,7 @@ export default function App() {
                   disabled={selected !== null}
                   style={{
                     padding: "0.875rem 1rem",
-                    fontSize: "1.4rem",
+                    fontSize: "2rem",
                     fontWeight: 500,
                     background: bg,
                     color: textColor,
@@ -1716,7 +1716,7 @@ export default function App() {
                     <span style={{ display: "flex", alignItems: "baseline", gap: "0.5rem" }}>
                       <span>{opt.expression}</span>
                       {opt.expression !== opt.reading && (
-                        <span style={{ fontSize: "0.95rem", opacity: selected ? 0.7 : 0.5, fontWeight: 400 }}>
+                        <span style={{ fontSize: "1.25rem", opacity: selected ? 0.7 : 0.5, fontWeight: 400 }}>
                           {opt.reading}
                         </span>
                       )}
@@ -1737,8 +1737,8 @@ export default function App() {
               textAlign: "center",
               border: "1px solid rgba(192,57,43,0.2)",
             }}>
-              <div style={{ fontSize: "1.5rem", fontWeight: 700 }}>{q.expression}</div>
-              <div style={{ fontSize: "0.95rem", opacity: 0.6 }}>{q.reading}</div>
+              <div style={{ fontSize: "1.9rem", fontWeight: 700 }}>{q.expression}</div>
+              <div style={{ fontSize: "1.1rem", opacity: 0.6 }}>{q.reading}</div>
               <div style={{ fontSize: "1rem", fontWeight: 600, marginTop: "0.5rem" }}>{q.pl}</div>
             </div>
           )}
