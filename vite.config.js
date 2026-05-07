@@ -2,11 +2,18 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 
+const buildVersion =
+  process.env.GITHUB_SHA?.slice(0, 7) ||
+  new Date().toISOString().slice(0, 16).replace("T", " ");
+
 export default defineConfig({
+  define: {
+    __BUILD_VERSION__: JSON.stringify(buildVersion),
+  },
   plugins: [
     react(),
     VitePWA({
-      registerType: "autoUpdate",
+      registerType: "prompt",
       manifest: {
         name: "JLPT N5 Quiz",
         short_name: "JLPT Quiz",
