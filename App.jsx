@@ -1330,11 +1330,6 @@ function AppContent() {
   const [questionCount, setQuestionCount] = useState(10);
   const [showRomaji, setShowRomaji] = useState(false);
 
-  const renderReading = useCallback(
-    (r) => (showRomaji ? toRomaji(r) : r),
-    [showRomaji]
-  );
-
   // Quiz state
   const [questions, setQuestions] = useState([]);
   const [currentQ, setCurrentQ] = useState(0);
@@ -1729,35 +1724,57 @@ function AppContent() {
 
             {/* Reading script (kana / romaji) */}
             <div style={{ marginBottom: "1.5rem" }}>
-              <label style={{ fontWeight: 600, fontSize: "0.85rem", display: "block", marginBottom: "0.5rem" }}>
-                Czytanie
-              </label>
-              <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-                {[
-                  { value: false, label: "Kana" },
-                  { value: true, label: "Romaji" },
-                ].map((o) => (
-                  <button
-                    key={String(o.value)}
-                    onClick={() => setShowRomaji(o.value)}
+              <button
+                onClick={() => setShowRomaji((v) => !v)}
+                role="switch"
+                aria-checked={showRomaji}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  width: "100%",
+                  gap: "0.75rem",
+                  padding: "0.75rem 1rem",
+                  borderRadius: "8px",
+                  border: "2px solid #ddd",
+                  background: "transparent",
+                  color: "inherit",
+                  cursor: "pointer",
+                  userSelect: "none",
+                  WebkitTapHighlightColor: "transparent",
+                  minHeight: "48px",
+                }}
+              >
+                <span style={{ fontWeight: 600, fontSize: "0.9rem" }}>
+                  Pokaż romaji
+                </span>
+                <span
+                  aria-hidden
+                  style={{
+                    width: "44px",
+                    height: "26px",
+                    borderRadius: "13px",
+                    background: showRomaji ? "#1a1a2e" : "#ccc",
+                    position: "relative",
+                    transition: "background 0.2s",
+                    flexShrink: 0,
+                  }}
+                >
+                  <span
                     style={{
-                      padding: "0.6rem 1rem",
-                      borderRadius: "8px",
-                      border: showRomaji === o.value ? "2px solid #1a1a2e" : "2px solid #ddd",
-                      background: showRomaji === o.value ? "#1a1a2e" : "transparent",
-                      color: showRomaji === o.value ? "#fff" : "inherit",
-                      cursor: "pointer",
-                      fontWeight: 500,
-                      fontSize: "0.85rem",
-                      minHeight: "44px",
-                      userSelect: "none",
-                      WebkitTapHighlightColor: "transparent",
+                      position: "absolute",
+                      top: "3px",
+                      left: showRomaji ? "21px" : "3px",
+                      width: "20px",
+                      height: "20px",
+                      borderRadius: "50%",
+                      background: "#fff",
+                      transition: "left 0.2s",
+                      boxShadow: "0 1px 2px rgba(0,0,0,0.2)",
                     }}
-                  >
-                    {o.label}
-                  </button>
-                ))}
-              </div>
+                  />
+                </span>
+              </button>
             </div>
 
             {/* Categories */}
@@ -1882,8 +1899,13 @@ function AppContent() {
                   {q.expression}
                 </div>
                 <div style={{ fontSize: "1.1rem", opacity: 0.5, marginTop: "0.5rem" }}>
-                  {renderReading(q.reading)}
+                  {q.reading}
                 </div>
+                {showRomaji && (
+                  <div style={{ fontSize: "0.95rem", opacity: 0.4, marginTop: "0.15rem", fontStyle: "italic" }}>
+                    {toRomaji(q.reading)}
+                  </div>
+                )}
               </>
             )}
             {mode === "pl-jp" && (
@@ -1892,9 +1914,16 @@ function AppContent() {
               </div>
             )}
             {mode === "reading" && (
-              <div style={{ fontSize: "3rem", fontWeight: 700 }}>
-                {renderReading(q.reading)}
-              </div>
+              <>
+                <div style={{ fontSize: "3rem", fontWeight: 700 }}>
+                  {q.reading}
+                </div>
+                {showRomaji && (
+                  <div style={{ fontSize: "1.1rem", opacity: 0.5, marginTop: "0.4rem", fontStyle: "italic" }}>
+                    {toRomaji(q.reading)}
+                  </div>
+                )}
+              </>
             )}
           </div>
 
@@ -1949,19 +1978,21 @@ function AppContent() {
                     WebkitTapHighlightColor: "transparent",
                   }}
                 >
-                  {mode === "pl-jp" ? (() => {
-                    const readingDisplay = renderReading(opt.reading);
-                    return (
-                      <span style={{ display: "flex", alignItems: "baseline", gap: "0.5rem" }}>
-                        <span>{opt.expression}</span>
-                        {opt.expression !== readingDisplay && (
-                          <span style={{ fontSize: "1.25rem", opacity: selected ? 0.7 : 0.5, fontWeight: 400 }}>
-                            {readingDisplay}
-                          </span>
-                        )}
-                      </span>
-                    );
-                  })() : displayValue}
+                  {mode === "pl-jp" ? (
+                    <span style={{ display: "flex", alignItems: "baseline", gap: "0.5rem", flexWrap: "wrap", justifyContent: "center" }}>
+                      <span>{opt.expression}</span>
+                      {opt.expression !== opt.reading && (
+                        <span style={{ fontSize: "1.25rem", opacity: selected ? 0.7 : 0.5, fontWeight: 400 }}>
+                          {opt.reading}
+                        </span>
+                      )}
+                      {showRomaji && (
+                        <span style={{ fontSize: "1rem", opacity: selected ? 0.6 : 0.4, fontWeight: 400, fontStyle: "italic" }}>
+                          {toRomaji(opt.reading)}
+                        </span>
+                      )}
+                    </span>
+                  ) : displayValue}
                 </button>
               );
             })}
@@ -1978,7 +2009,12 @@ function AppContent() {
               border: "1px solid rgba(192,57,43,0.2)",
             }}>
               <div style={{ fontSize: "1.9rem", fontWeight: 700 }}>{q.expression}</div>
-              <div style={{ fontSize: "1.1rem", opacity: 0.6 }}>{renderReading(q.reading)}</div>
+              <div style={{ fontSize: "1.1rem", opacity: 0.6 }}>{q.reading}</div>
+              {showRomaji && (
+                <div style={{ fontSize: "0.95rem", opacity: 0.5, fontStyle: "italic" }}>
+                  {toRomaji(q.reading)}
+                </div>
+              )}
               <div style={{ fontSize: "1rem", fontWeight: 600, marginTop: "0.5rem" }}>{q.pl}</div>
             </div>
           )}
@@ -2029,13 +2065,20 @@ function AppContent() {
                         borderLeft: "3px solid #c0392b",
                       }}
                     >
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "0.5rem" }}>
                         <span style={{ fontSize: "1.2rem", fontWeight: 700 }}>
                           {err.word.expression}
                         </span>
-                        <span style={{ fontSize: "0.8rem", opacity: 0.5 }}>
-                          {renderReading(err.word.reading)}
-                        </span>
+                        <div style={{ textAlign: "right" }}>
+                          <div style={{ fontSize: "0.8rem", opacity: 0.5 }}>
+                            {err.word.reading}
+                          </div>
+                          {showRomaji && (
+                            <div style={{ fontSize: "0.7rem", opacity: 0.4, fontStyle: "italic" }}>
+                              {toRomaji(err.word.reading)}
+                            </div>
+                          )}
+                        </div>
                       </div>
                       <div style={{ fontSize: "0.85rem", fontWeight: 500, marginTop: "0.2rem" }}>
                         {err.word.pl}
