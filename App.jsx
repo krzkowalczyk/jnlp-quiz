@@ -863,6 +863,109 @@ const CATEGORIZED_VOCAB = VOCAB_DATA.map((w) => ({
 }));
 
 // ============================================================================
+// ROMAJI CONVERSION (hiragana / katakana → Latin alphabet, Hepburn-ish)
+// ============================================================================
+const KANA_MAP = {
+  // Yōon (small ya/yu/yo combos) — must be matched before single kana
+  "きゃ":"kya","きゅ":"kyu","きょ":"kyo",
+  "しゃ":"sha","しゅ":"shu","しょ":"sho",
+  "ちゃ":"cha","ちゅ":"chu","ちょ":"cho",
+  "にゃ":"nya","にゅ":"nyu","にょ":"nyo",
+  "ひゃ":"hya","ひゅ":"hyu","ひょ":"hyo",
+  "みゃ":"mya","みゅ":"myu","みょ":"myo",
+  "りゃ":"rya","りゅ":"ryu","りょ":"ryo",
+  "ぎゃ":"gya","ぎゅ":"gyu","ぎょ":"gyo",
+  "じゃ":"ja","じゅ":"ju","じょ":"jo",
+  "びゃ":"bya","びゅ":"byu","びょ":"byo",
+  "ぴゃ":"pya","ぴゅ":"pyu","ぴょ":"pyo",
+  "キャ":"kya","キュ":"kyu","キョ":"kyo",
+  "シャ":"sha","シュ":"shu","ショ":"sho",
+  "チャ":"cha","チュ":"chu","チョ":"cho",
+  "ニャ":"nya","ニュ":"nyu","ニョ":"nyo",
+  "ヒャ":"hya","ヒュ":"hyu","ヒョ":"hyo",
+  "ミャ":"mya","ミュ":"myu","ミョ":"myo",
+  "リャ":"rya","リュ":"ryu","リョ":"ryo",
+  "ギャ":"gya","ギュ":"gyu","ギョ":"gyo",
+  "ジャ":"ja","ジュ":"ju","ジョ":"jo",
+  "ビャ":"bya","ビュ":"byu","ビョ":"byo",
+  "ピャ":"pya","ピュ":"pyu","ピョ":"pyo",
+  // Katakana extras (loanwords)
+  "ファ":"fa","フィ":"fi","フェ":"fe","フォ":"fo",
+  "ティ":"ti","ディ":"di","ウィ":"wi","ウェ":"we","ウォ":"wo",
+  "ヴァ":"va","ヴィ":"vi","ヴェ":"ve","ヴォ":"vo",
+  // Hiragana basic
+  "あ":"a","い":"i","う":"u","え":"e","お":"o",
+  "か":"ka","き":"ki","く":"ku","け":"ke","こ":"ko",
+  "さ":"sa","し":"shi","す":"su","せ":"se","そ":"so",
+  "た":"ta","ち":"chi","つ":"tsu","て":"te","と":"to",
+  "な":"na","に":"ni","ぬ":"nu","ね":"ne","の":"no",
+  "は":"ha","ひ":"hi","ふ":"fu","へ":"he","ほ":"ho",
+  "ま":"ma","み":"mi","む":"mu","め":"me","も":"mo",
+  "や":"ya","ゆ":"yu","よ":"yo",
+  "ら":"ra","り":"ri","る":"ru","れ":"re","ろ":"ro",
+  "わ":"wa","を":"wo","ん":"n",
+  // Hiragana dakuten / handakuten
+  "が":"ga","ぎ":"gi","ぐ":"gu","げ":"ge","ご":"go",
+  "ざ":"za","じ":"ji","ず":"zu","ぜ":"ze","ぞ":"zo",
+  "だ":"da","ぢ":"ji","づ":"zu","で":"de","ど":"do",
+  "ば":"ba","び":"bi","ぶ":"bu","べ":"be","ぼ":"bo",
+  "ぱ":"pa","ぴ":"pi","ぷ":"pu","ぺ":"pe","ぽ":"po",
+  // Katakana basic
+  "ア":"a","イ":"i","ウ":"u","エ":"e","オ":"o",
+  "カ":"ka","キ":"ki","ク":"ku","ケ":"ke","コ":"ko",
+  "サ":"sa","シ":"shi","ス":"su","セ":"se","ソ":"so",
+  "タ":"ta","チ":"chi","ツ":"tsu","テ":"te","ト":"to",
+  "ナ":"na","ニ":"ni","ヌ":"nu","ネ":"ne","ノ":"no",
+  "ハ":"ha","ヒ":"hi","フ":"fu","ヘ":"he","ホ":"ho",
+  "マ":"ma","ミ":"mi","ム":"mu","メ":"me","モ":"mo",
+  "ヤ":"ya","ユ":"yu","ヨ":"yo",
+  "ラ":"ra","リ":"ri","ル":"ru","レ":"re","ロ":"ro",
+  "ワ":"wa","ヲ":"wo","ン":"n",
+  "ガ":"ga","ギ":"gi","グ":"gu","ゲ":"ge","ゴ":"go",
+  "ザ":"za","ジ":"ji","ズ":"zu","ゼ":"ze","ゾ":"zo",
+  "ダ":"da","ヂ":"ji","ヅ":"zu","デ":"de","ド":"do",
+  "バ":"ba","ビ":"bi","ブ":"bu","ベ":"be","ボ":"bo",
+  "パ":"pa","ピ":"pi","プ":"pu","ペ":"pe","ポ":"po",
+  "ヴ":"vu",
+};
+
+function toRomaji(s) {
+  if (!s) return s;
+  let out = "";
+  let i = 0;
+  let doubleNext = false;
+  while (i < s.length) {
+    const ch = s[i];
+    // Sokuon (small tsu) → double the next consonant
+    if (ch === "っ" || ch === "ッ") {
+      doubleNext = true;
+      i++;
+      continue;
+    }
+    // Chōonpu (long-vowel mark) → repeat last vowel
+    if (ch === "ー") {
+      const last = out[out.length - 1];
+      if (last && /[aeiou]/i.test(last)) out += last;
+      i++;
+      continue;
+    }
+    let romaji = "";
+    let consumed = 0;
+    const two = s.slice(i, i + 2);
+    if (KANA_MAP[two]) { romaji = KANA_MAP[two]; consumed = 2; }
+    else if (KANA_MAP[ch]) { romaji = KANA_MAP[ch]; consumed = 1; }
+    else { out += ch; i++; continue; }
+    if (doubleNext) {
+      out += romaji.startsWith("ch") ? "t" : romaji[0];
+      doubleNext = false;
+    }
+    out += romaji;
+    i += consumed;
+  }
+  return out;
+}
+
+// ============================================================================
 // STORAGE HELPERS (window.storage API)
 // ============================================================================
 const STORAGE_KEY = "jlpt-n5-progress";
@@ -1225,6 +1328,12 @@ function AppContent() {
     Object.keys(CATEGORIES)
   );
   const [questionCount, setQuestionCount] = useState(10);
+  const [showRomaji, setShowRomaji] = useState(false);
+
+  const renderReading = useCallback(
+    (r) => (showRomaji ? toRomaji(r) : r),
+    [showRomaji]
+  );
 
   // Quiz state
   const [questions, setQuestions] = useState([]);
@@ -1618,6 +1727,39 @@ function AppContent() {
               </div>
             </div>
 
+            {/* Reading script (kana / romaji) */}
+            <div style={{ marginBottom: "1.5rem" }}>
+              <label style={{ fontWeight: 600, fontSize: "0.85rem", display: "block", marginBottom: "0.5rem" }}>
+                Czytanie
+              </label>
+              <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                {[
+                  { value: false, label: "Kana" },
+                  { value: true, label: "Romaji" },
+                ].map((o) => (
+                  <button
+                    key={String(o.value)}
+                    onClick={() => setShowRomaji(o.value)}
+                    style={{
+                      padding: "0.6rem 1rem",
+                      borderRadius: "8px",
+                      border: showRomaji === o.value ? "2px solid #1a1a2e" : "2px solid #ddd",
+                      background: showRomaji === o.value ? "#1a1a2e" : "transparent",
+                      color: showRomaji === o.value ? "#fff" : "inherit",
+                      cursor: "pointer",
+                      fontWeight: 500,
+                      fontSize: "0.85rem",
+                      minHeight: "44px",
+                      userSelect: "none",
+                      WebkitTapHighlightColor: "transparent",
+                    }}
+                  >
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Categories */}
             {!reviewMode && (
               <div style={{ marginBottom: "1.5rem" }}>
@@ -1740,7 +1882,7 @@ function AppContent() {
                   {q.expression}
                 </div>
                 <div style={{ fontSize: "1.1rem", opacity: 0.5, marginTop: "0.5rem" }}>
-                  {q.reading}
+                  {renderReading(q.reading)}
                 </div>
               </>
             )}
@@ -1751,7 +1893,7 @@ function AppContent() {
             )}
             {mode === "reading" && (
               <div style={{ fontSize: "3rem", fontWeight: 700 }}>
-                {q.reading}
+                {renderReading(q.reading)}
               </div>
             )}
           </div>
@@ -1807,16 +1949,19 @@ function AppContent() {
                     WebkitTapHighlightColor: "transparent",
                   }}
                 >
-                  {mode === "pl-jp" ? (
-                    <span style={{ display: "flex", alignItems: "baseline", gap: "0.5rem" }}>
-                      <span>{opt.expression}</span>
-                      {opt.expression !== opt.reading && (
-                        <span style={{ fontSize: "1.25rem", opacity: selected ? 0.7 : 0.5, fontWeight: 400 }}>
-                          {opt.reading}
-                        </span>
-                      )}
-                    </span>
-                  ) : displayValue}
+                  {mode === "pl-jp" ? (() => {
+                    const readingDisplay = renderReading(opt.reading);
+                    return (
+                      <span style={{ display: "flex", alignItems: "baseline", gap: "0.5rem" }}>
+                        <span>{opt.expression}</span>
+                        {opt.expression !== readingDisplay && (
+                          <span style={{ fontSize: "1.25rem", opacity: selected ? 0.7 : 0.5, fontWeight: 400 }}>
+                            {readingDisplay}
+                          </span>
+                        )}
+                      </span>
+                    );
+                  })() : displayValue}
                 </button>
               );
             })}
@@ -1833,7 +1978,7 @@ function AppContent() {
               border: "1px solid rgba(192,57,43,0.2)",
             }}>
               <div style={{ fontSize: "1.9rem", fontWeight: 700 }}>{q.expression}</div>
-              <div style={{ fontSize: "1.1rem", opacity: 0.6 }}>{q.reading}</div>
+              <div style={{ fontSize: "1.1rem", opacity: 0.6 }}>{renderReading(q.reading)}</div>
               <div style={{ fontSize: "1rem", fontWeight: 600, marginTop: "0.5rem" }}>{q.pl}</div>
             </div>
           )}
@@ -1889,7 +2034,7 @@ function AppContent() {
                           {err.word.expression}
                         </span>
                         <span style={{ fontSize: "0.8rem", opacity: 0.5 }}>
-                          {err.word.reading}
+                          {renderReading(err.word.reading)}
                         </span>
                       </div>
                       <div style={{ fontSize: "0.85rem", fontWeight: 500, marginTop: "0.2rem" }}>
